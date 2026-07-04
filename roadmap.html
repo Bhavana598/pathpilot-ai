@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Roadmap - PathPilot AI</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ================= NAVBAR ================= -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="logo">PathPilot AI</div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main class="roadmap-page">
+
+    <!-- Loading state while videos/books fetch or roadmap missing -->
+    <div id="loading-state" class="loading-state hidden">
+      <div class="spinner large"></div>
+      <p>Loading your roadmap...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="error-box hidden" style="margin: 40px auto; max-width: 500px;">
+      <p id="roadmap-error-message">Something went wrong loading your roadmap.</p>
+      <button id="roadmap-retry-btn" class="btn-secondary">Back to Home</button>
+    </div>
+
+    <!-- Main content -->
+    <div id="roadmap-content" class="hidden">
+
+      <!-- ================= HEADER ================= -->
+      <section class="roadmap-header">
+        <h1 id="career-name">Career Name</h1>
+        <p id="career-overview">Overview goes here.</p>
+        <button id="download-pdf-btn" class="btn-primary">Download Roadmap</button>
+      </section>
+
+      <!-- ================= WEEKLY ROADMAP ================= -->
+      <section class="section-block">
+        <h2>Weekly Roadmap</h2>
+        <div id="weeks-container" class="cards-grid"></div>
+      </section>
+
+      <!-- ================= SKILLS ================= -->
+      <section class="section-block">
+        <h2>Skills You'll Learn</h2>
+        <div id="skills-tags" class="tags-container"></div>
+      </section>
+
+      <!-- ================= PROJECTS ================= -->
+      <section class="section-block">
+        <h2>Beginner Projects</h2>
+        <div id="projects-container" class="cards-grid"></div>
+      </section>
+
+      <!-- ================= RESOURCES ================= -->
+      <section class="section-block">
+        <h2>Learning Resources</h2>
+        <ul id="resources-list" class="resources-list"></ul>
+      </section>
+
+      <!-- ================= YOUTUBE ================= -->
+      <section class="section-block">
+        <h2>Recommended Videos</h2>
+        <div id="youtube-container" class="cards-grid"></div>
+      </section>
+
+      <!-- ================= BOOKS ================= -->
+      <section class="section-block">
+        <h2>Recommended Books</h2>
+        <div id="books-container" class="cards-grid"></div>
+      </section>
+
+      <!-- ================= PROGRESS TRACKER ================= -->
+      <section class="section-block">
+        <h2>Progress Tracker</h2>
+        <div class="progress-bar-wrapper">
+          <div class="progress-bar-track">
+            <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <span id="progress-percent">0%</span>
+        </div>
+        <ul id="checklist" class="checklist"></ul>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Hidden container used only for generating a clean PDF snapshot -->
+  <div id="pdf-render-area" style="position: absolute; left: -9999px; top: 0;"></div>
+
+  <script src="roadmap.js"></script>
+</body>
+</html>
