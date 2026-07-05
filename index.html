@@ -5,20 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PathPilot AI - Career Roadmap Generator</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body>
 
-  <!-- ================= NAVBAR ================= -->
+  
   <nav class="navbar">
     <div class="nav-container">
-      <div class="logo">PathPilot AI</div>
+      <h1 class="logo">
+  <i class="fas fa-robot"></i>
+  PathPilot AI
+</h1>
       <ul class="nav-links">
         <li><a href="index.html">Home</a></li>
       </ul>
     </div>
   </nav>
 
-  <!-- ================= HERO SECTION ================= -->
+  
   <section class="hero">
     <div class="hero-content">
       <h1>Generate Your AI Career Roadmap</h1>
@@ -26,7 +30,7 @@
         Generate a personalized roadmap with AI, learning resources, videos, and books.
       </p>
 
-      <!-- ================= GENERATOR FORM ================= -->
+      
       <div class="generator-card">
         <div class="form-group">
           <label for="career-select">Choose a Career Path</label>
@@ -61,7 +65,7 @@
           <span id="btn-spinner" class="spinner hidden"></span>
         </button>
 
-        <!-- Error message with retry -->
+       
         <div id="error-box" class="error-box hidden">
           <p id="error-message">Something went wrong. Please try again.</p>
           <button id="retry-btn" class="btn-secondary">Retry</button>

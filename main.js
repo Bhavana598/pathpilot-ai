@@ -1,9 +1,3 @@
-// ============================================================
-// PathPilot AI - main.js
-// Handles the home page: collecting inputs, calling the backend
-// to generate a roadmap, and redirecting to the roadmap page.
-// ============================================================
-
 const API_BASE = window.location.origin;
 
 const careerSelect = document.getElementById('career-select');
@@ -15,7 +9,7 @@ const errorBox = document.getElementById('error-box');
 const errorMessage = document.getElementById('error-message');
 const retryBtn = document.getElementById('retry-btn');
 
-// Keep track of the last attempted request so Retry can replay it
+
 let lastAttempt = null;
 
 function setLoading(isLoading) {
@@ -55,8 +49,7 @@ async function generateRoadmap() {
 
     const roadmap = await response.json();
 
-    // Save the fresh roadmap and reset any prior progress data,
-    // since this is a brand new roadmap for possibly a new career.
+    
     localStorage.setItem('pathpilot_roadmap', JSON.stringify(roadmap));
     localStorage.setItem('pathpilot_checked_skills', JSON.stringify([]));
     localStorage.setItem('pathpilot_progress', '0');

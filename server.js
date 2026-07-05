@@ -1,8 +1,4 @@
-// ============================================================
-// PathPilot AI - Backend Server
-// Handles: Gemini roadmap generation, YouTube video search,
-// Open Library book search. API keys stay server-side only.
-// ============================================================
+
 
 require('dotenv').config();
 const express = require('express');
@@ -15,23 +11,18 @@ const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
-// ---------- Middleware ----------
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); // serve index.html, roadmap.html, style.css, js files
+app.use(express.static(__dirname)); 
 
-// ------------------------------------------------------------
-// Helper: Extract JSON safely from Gemini's text response.
-// Gemini sometimes wraps JSON in ```json fences or adds text
-// around it, so we strip fences and grab the first {...} block.
-// ------------------------------------------------------------
 function extractJson(rawText) {
   let cleaned = rawText.trim();
 
-  // Remove markdown code fences if present
+  
   cleaned = cleaned.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-  // Find the first '{' and the last '}' to isolate the JSON object
+ 
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
 
@@ -41,8 +32,6 @@ function extractJson(rawText) {
 
   let jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
 
-  // Remove trailing commas before ] or } which Gemini sometimes adds
-  // and which are invalid in strict JSON (e.g. [1, 2, 3,] or {"a":1,})
   jsonSlice = jsonSlice.replace(/,\s*([\]}])/g, '$1');
 
   try {
@@ -53,11 +42,7 @@ function extractJson(rawText) {
   }
 }
 
-// ------------------------------------------------------------
-// POST /generate-roadmap
-// Body: { career, skillLevel }
-// Sends a structured prompt to Gemini and returns parsed JSON.
-// ------------------------------------------------------------
+
 app.post('/generate-roadmap', async (req, res) => {
   try {
     const { career, skillLevel } = req.body;
@@ -122,7 +107,7 @@ Requirements:
 
     const roadmapJson = extractJson(rawText);
 
-    // Basic shape validation / fallback defaults so the frontend never breaks
+    
     roadmapJson.career = roadmapJson.career || career;
     roadmapJson.overview = roadmapJson.overview || '';
     roadmapJson.weeks = Array.isArray(roadmapJson.weeks) ? roadmapJson.weeks : [];
@@ -141,10 +126,7 @@ Requirements:
   }
 });
 
-// ------------------------------------------------------------
-// GET /youtube?career=
-// Returns top 4 YouTube videos related to the career.
-// ------------------------------------------------------------
+
 app.get('/youtube', async (req, res) => {
   try {
     const { career } = req.query;
@@ -186,10 +168,7 @@ app.get('/youtube', async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// GET /books?career=
-// Returns top 4 books from Open Library (no API key needed).
-// ------------------------------------------------------------
+
 app.get('/books', async (req, res) => {
   try {
     const { career } = req.query;
@@ -227,9 +206,7 @@ app.get('/books', async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// Health check
-// ------------------------------------------------------------
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });

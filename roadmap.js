@@ -1,13 +1,6 @@
-// ============================================================
-// PathPilot AI - roadmap.js
-// Renders the roadmap page from localStorage data, fetches
-// YouTube videos + books, manages the progress checklist,
-// and exports the roadmap to PDF.
-// ============================================================
-
 const API_BASE = window.location.origin;
 
-// ---------- DOM references ----------
+
 const loadingState = document.getElementById('loading-state');
 const errorState = document.getElementById('error-state');
 const roadmapErrorMessage = document.getElementById('roadmap-error-message');
@@ -29,9 +22,6 @@ const downloadPdfBtn = document.getElementById('download-pdf-btn');
 
 let currentRoadmap = null;
 
-// ------------------------------------------------------------
-// Utility: safe localStorage read
-// ------------------------------------------------------------
 function loadRoadmapFromStorage() {
   try {
     const raw = localStorage.getItem('pathpilot_roadmap');
@@ -59,9 +49,6 @@ function saveProgress(percent) {
   localStorage.setItem('pathpilot_progress', String(percent));
 }
 
-// ------------------------------------------------------------
-// Rendering functions
-// ------------------------------------------------------------
 function renderHeader(roadmap) {
   careerNameEl.textContent = roadmap.career || 'Your Career Roadmap';
   careerOverviewEl.textContent = roadmap.overview || '';
@@ -135,7 +122,7 @@ function renderChecklist(skills) {
     checklist.appendChild(li);
   });
 
-  // Attach change listeners after render
+  
   checklist.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
     checkbox.addEventListener('change', handleChecklistChange);
   });
@@ -213,9 +200,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ------------------------------------------------------------
-// Fetch supplementary data (videos + books) from backend
-// ------------------------------------------------------------
 async function fetchYoutubeVideos(career) {
   const response = await fetch(`${API_BASE}/youtube?career=${encodeURIComponent(career)}`);
   if (!response.ok) {
@@ -236,9 +220,6 @@ async function fetchBooks(career) {
   return data.books || [];
 }
 
-// ------------------------------------------------------------
-// PDF export using jsPDF
-// ------------------------------------------------------------
 function downloadRoadmapAsPdf() {
   if (!currentRoadmap) return;
 
@@ -298,9 +279,6 @@ function downloadRoadmapAsPdf() {
   doc.save(`${(currentRoadmap.career || 'career').replace(/\s+/g, '_')}_Roadmap.pdf`);
 }
 
-// ------------------------------------------------------------
-// Init
-// ------------------------------------------------------------
 async function init() {
   const roadmap = loadRoadmapFromStorage();
 
@@ -314,7 +292,7 @@ async function init() {
 
   currentRoadmap = roadmap;
 
-  // Render everything we already have locally right away
+  
   renderHeader(roadmap);
   renderWeeks(roadmap.weeks);
   renderSkillsTags(roadmap.skills);
@@ -323,8 +301,6 @@ async function init() {
   renderChecklist(roadmap.skills);
   roadmapContent.classList.remove('hidden');
 
-  // Fetch videos and books (these can fail independently without
-  // blocking the rest of the roadmap from displaying)
   loadingState.classList.remove('hidden');
 
   try {
