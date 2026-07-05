@@ -1,5 +1,8 @@
 # PathPilot AI – Career Roadmap Generator
 
+Live demo: https://pathpilot-ai-hdub.onrender.com
+(Free hosting — first load after inactivity may take ~50 seconds to wake up.)
+
 ## Setup
 
 1. Install dependencies:
@@ -26,9 +29,14 @@
 
 - **index.html** — pick a career + skill level, click **Generate Roadmap**. This calls `POST /generate-roadmap`, which prompts Gemini and returns structured JSON. The result is saved to `localStorage` and you're redirected to `roadmap.html`.
 - **roadmap.html** — reads the roadmap from `localStorage` and renders it instantly, then fetches YouTube videos (`GET /youtube?career=`) and books (`GET /books?career=`) in parallel.
+- **Learning resources** — each resource links to its real official site when Gemini provides one, otherwise falls back to a search link.
 - **Progress tracker** — checking a skill in the checklist updates the progress bar and persists to `localStorage`, so it's restored on your next visit.
 - **Download Roadmap** — uses jsPDF (loaded via CDN) to export the full roadmap as a PDF.
 - **Error handling** — any failed API call shows a friendly message with a **Retry** button instead of a blank/broken screen.
+
+## Deployment
+
+Deployed on Render as a Node web service (`npm install` build, `npm start` start command). API keys are set directly in Render's Environment tab — `.env` is only used for local development.
 
 ## Notes
 
