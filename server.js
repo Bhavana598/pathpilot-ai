@@ -1,4 +1,8 @@
-
+// ============================================================
+// PathPilot AI - Backend Server
+// Handles: Gemini roadmap generation, YouTube video search,
+// Open Library book search. API keys stay server-side only.
+// ============================================================
 
 require('dotenv').config();
 const express = require('express');
@@ -11,18 +15,23 @@ const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
-
+// ---------- Middleware ----------
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); 
+app.use(express.static(__dirname)); // serve index.html, roadmap.html, style.css, js files
 
+// ------------------------------------------------------------
+// Helper: Extract JSON safely from Gemini's text response.
+// Gemini sometimes wraps JSON in ```json fences or adds text
+// around it, so we strip fences and grab the first {...} block.
+// ------------------------------------------------------------
 function extractJson(rawText) {
   let cleaned = rawText.trim();
 
-  
+  // Remove markdown code fences if present
   cleaned = cleaned.replace(/```json/gi, '').replace(/```/g, '').trim();
 
- 
+  // Find the first '{' and the last '}' to isolate the JSON object
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
 
@@ -32,6 +41,8 @@ function extractJson(rawText) {
 
   let jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
 
+  // Remove trailing commas before ] or } which Gemini sometimes adds
+  // and which are invalid in strict JSON (e.g. [1, 2, 3,] or {"a":1,})
   jsonSlice = jsonSlice.replace(/,\s*([\]}])/g, '$1');
 
   try {
@@ -42,7 +53,41 @@ function extractJson(rawText) {
   }
 }
 
+function isValidHttpUrl(str) {
+  try {
+    const u = new URL(str);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
+// Gemini may return resources as plain strings (older format) or as
+// { name, url } objects. This normalizes both into one consistent shape
+// and falls back to a Google search link if the url is missing/invalid,
+// so the frontend never has to deal with a dead or malformed link.
+function normalizeResource(resource) {
+  if (typeof resource === 'string') {
+    return {
+      name: resource,
+      url: `https://www.google.com/search?q=${encodeURIComponent(resource)}`
+    };
+  }
+
+  const name = (resource && resource.name) || 'Resource';
+  const url =
+    resource && resource.url && isValidHttpUrl(resource.url)
+      ? resource.url
+      : `https://www.google.com/search?q=${encodeURIComponent(name)}`;
+
+  return { name, url };
+}
+
+// ------------------------------------------------------------
+// POST /generate-roadmap
+// Body: { career, skillLevel }
+// Sends a structured prompt to Gemini and returns parsed JSON.
+// ------------------------------------------------------------
 app.post('/generate-roadmap', async (req, res) => {
   try {
     const { career, skillLevel } = req.body;
@@ -68,20 +113,25 @@ The JSON must exactly follow this structure:
   ],
   "skills": ["string", "string"],
   "projects": ["string", "string", "string"],
-  "resources": ["string", "string"]
+  "resources": [
+    { "name": "string", "url": "string" }
+  ]
 }
 
 Requirements:
 - Include between 8 and 12 weeks in the "weeks" array, numbered sequentially starting at 1.
 - Include 6 to 10 relevant "skills" as short tags (e.g. "HTML", "Git").
 - Include exactly 3 beginner-friendly "projects" tailored to ${career}.
-- Include 4 to 6 free "resources" (named platforms, docs, or course titles — no need for real URLs).
+- Include 4 to 6 free "resources". Each resource needs a "name" (e.g. "freeCodeCamp") and a "url"
+  pointing to that resource's real, official homepage or documentation root (e.g. "https://www.freecodecamp.org/",
+  "https://developer.mozilla.org/", "https://docs.python.org/3/"). Use only well-known, real, stable URLs you are
+  confident actually exist — do not invent or guess a URL.
 - Tailor difficulty and pacing to a ${skillLevel} learner.
 - Keep descriptions concise (one short sentence each) so the full response fits comfortably within the output limit.
 - Output must be valid, complete, parseable JSON with no trailing commas and no truncation. Make sure the final closing brace is included.
 `.trim();
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
 
     const geminiResponse = await axios.post(
       geminiUrl,
@@ -107,13 +157,15 @@ Requirements:
 
     const roadmapJson = extractJson(rawText);
 
-    
+    // Basic shape validation / fallback defaults so the frontend never breaks
     roadmapJson.career = roadmapJson.career || career;
     roadmapJson.overview = roadmapJson.overview || '';
     roadmapJson.weeks = Array.isArray(roadmapJson.weeks) ? roadmapJson.weeks : [];
     roadmapJson.skills = Array.isArray(roadmapJson.skills) ? roadmapJson.skills : [];
     roadmapJson.projects = Array.isArray(roadmapJson.projects) ? roadmapJson.projects : [];
-    roadmapJson.resources = Array.isArray(roadmapJson.resources) ? roadmapJson.resources : [];
+    roadmapJson.resources = Array.isArray(roadmapJson.resources)
+      ? roadmapJson.resources.map((r) => normalizeResource(r))
+      : [];
 
     res.json(roadmapJson);
   } catch (err) {
@@ -126,7 +178,10 @@ Requirements:
   }
 });
 
-
+// ------------------------------------------------------------
+// GET /youtube?career=
+// Returns top 4 YouTube videos related to the career.
+// ------------------------------------------------------------
 app.get('/youtube', async (req, res) => {
   try {
     const { career } = req.query;
@@ -168,7 +223,10 @@ app.get('/youtube', async (req, res) => {
   }
 });
 
-
+// ------------------------------------------------------------
+// GET /books?career=
+// Returns top 4 books from Open Library (no API key needed).
+// ------------------------------------------------------------
 app.get('/books', async (req, res) => {
   try {
     const { career } = req.query;
@@ -182,20 +240,42 @@ app.get('/books', async (req, res) => {
     const response = await axios.get(openLibraryUrl, {
       params: {
         q: career,
-        limit: 4
+        limit: 20, // fetch extra so we can prioritize ones that are actually readable online
+        fields: 'title,author_name,cover_i,key,ia,ebook_access,has_fulltext'
       }
     });
 
-    const books = (response.data.docs || []).slice(0, 4).map((doc) => {
+    const allDocs = response.data.docs || [];
+
+    // Prefer books Internet Archive can render in its inline "read online" viewer.
+    // ebook_access "public" = fully readable now; "borrowable" = read after a
+    // 1-hour library loan (still no purchase). Both open a direct reader, not a store.
+    const readableDocs = allDocs.filter(
+      (doc) => doc.ia && doc.ia.length > 0 && ['public', 'borrowable'].includes(doc.ebook_access)
+    );
+
+    const chosenDocs = (readableDocs.length > 0 ? readableDocs : allDocs).slice(0, 4);
+
+    const books = chosenDocs.map((doc) => {
       const coverId = doc.cover_i;
       const coverUrl = coverId
         ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
         : 'https://via.placeholder.com/128x193?text=No+Cover';
 
+      // If Internet Archive has a scan, link straight to its reader.
+      // Otherwise fall back to the book's Open Library page.
+      const readUrl =
+        doc.ia && doc.ia.length > 0
+          ? `https://archive.org/details/${doc.ia[0]}`
+          : doc.key
+          ? `https://openlibrary.org${doc.key}`
+          : 'https://openlibrary.org';
+
       return {
         title: doc.title || 'Untitled',
         author: (doc.author_name && doc.author_name[0]) || 'Unknown Author',
-        cover: coverUrl
+        cover: coverUrl,
+        readUrl
       };
     });
 
@@ -206,7 +286,9 @@ app.get('/books', async (req, res) => {
   }
 });
 
-
+// ------------------------------------------------------------
+// Health check
+// ------------------------------------------------------------
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
