@@ -83,6 +83,74 @@ function normalizeResource(resource) {
   return { name, url };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Retries a single model's request on transient errors (503 = overloaded,
+// 429 = rate limited) with a short exponential backoff. Anything else
+// (400, 403, 404, etc.) fails immediately since retrying won't help.
+async function callGeminiWithRetry(url, payload, maxRetries = 2) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (err) {
+      lastError = err;
+      const status = err.response?.status;
+      const isTransient = status === 503 || status === 429;
+
+      if (!isTransient || attempt === maxRetries) {
+        throw err;
+      }
+
+      const delayMs = 1000 * Math.pow(2, attempt); // 1s, 2s...
+      console.warn(
+        `Gemini request failed with ${status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+// Models to try, in order. Different models often have independent load/quota,
+// so if the first one is overloaded (503) or rate-limited (429), we fall
+// through to the next one instead of failing outright.
+const GEMINI_MODEL_FALLBACKS = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+
+async function callGeminiWithFallback(payload) {
+  let lastError;
+
+  for (const model of GEMINI_MODEL_FALLBACKS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+
+    try {
+      const response = await callGeminiWithRetry(url, payload);
+      if (model !== GEMINI_MODEL_FALLBACKS[0]) {
+        console.log(`Succeeded using fallback model: ${model}`);
+      }
+      return response;
+    } catch (err) {
+      lastError = err;
+      const status = err.response?.status;
+      const isTransient = status === 503 || status === 429;
+
+      if (!isTransient) {
+        throw err; // non-transient error (bad key, bad request) - no point trying other models
+      }
+
+      console.warn(`Model ${model} unavailable (status ${status}), trying next fallback model...`);
+    }
+  }
+
+  throw lastError;
+}
+
 // ------------------------------------------------------------
 // POST /generate-roadmap
 // Body: { career, skillLevel }
@@ -131,23 +199,17 @@ Requirements:
 - Output must be valid, complete, parseable JSON with no trailing commas and no truncation. Make sure the final closing brace is included.
 `.trim();
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
-
-    const geminiResponse = await axios.post(
-      geminiUrl,
-      {
-        contents: [
-          {
-            parts: [{ text: prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096
+    const geminiResponse = await callGeminiWithFallback({
+      contents: [
+        {
+          parts: [{ text: prompt }]
         }
-      },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096
+      }
+    });
 
     const rawText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -170,11 +232,20 @@ Requirements:
     res.json(roadmapJson);
   } catch (err) {
     console.error('Error in /generate-roadmap:', err.message);
+    const status = err.response?.status;
     if (err.response) {
-      console.error('Gemini API response status:', err.response.status);
+      console.error('Gemini API response status:', status);
       console.error('Gemini API response data:', JSON.stringify(err.response.data, null, 2));
     }
-    res.status(500).json({ error: 'Failed to generate roadmap. Please try again.' });
+
+    const friendlyMessage =
+      status === 503
+        ? "Gemini is experiencing high demand right now. We retried a few times automatically — please try again in a moment."
+        : status === 429
+        ? 'API request limit reached. Please wait a bit before trying again.'
+        : 'Failed to generate roadmap. Please try again.';
+
+    res.status(500).json({ error: friendlyMessage });
   }
 });
 
