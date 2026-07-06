@@ -1,9 +1,3 @@
-// ============================================================
-// PathPilot AI - Backend Server
-// Handles: Gemini roadmap generation, YouTube video search,
-// Open Library book search. API keys stay server-side only.
-// ============================================================
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -15,23 +9,18 @@ const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
-// ---------- Middleware ----------
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); // serve index.html, roadmap.html, style.css, js files
+app.use(express.static(__dirname)); 
 
-// ------------------------------------------------------------
-// Helper: Extract JSON safely from Gemini's text response.
-// Gemini sometimes wraps JSON in ```json fences or adds text
-// around it, so we strip fences and grab the first {...} block.
-// ------------------------------------------------------------
 function extractJson(rawText) {
   let cleaned = rawText.trim();
 
-  // Remove markdown code fences if present
+  
   cleaned = cleaned.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-  // Find the first '{' and the last '}' to isolate the JSON object
+  
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
 
@@ -41,8 +30,6 @@ function extractJson(rawText) {
 
   let jsonSlice = cleaned.slice(firstBrace, lastBrace + 1);
 
-  // Remove trailing commas before ] or } which Gemini sometimes adds
-  // and which are invalid in strict JSON (e.g. [1, 2, 3,] or {"a":1,})
   jsonSlice = jsonSlice.replace(/,\s*([\]}])/g, '$1');
 
   try {
@@ -62,10 +49,6 @@ function isValidHttpUrl(str) {
   }
 }
 
-// Gemini may return resources as plain strings (older format) or as
-// { name, url } objects. This normalizes both into one consistent shape
-// and falls back to a Google search link if the url is missing/invalid,
-// so the frontend never has to deal with a dead or malformed link.
 function normalizeResource(resource) {
   if (typeof resource === 'string') {
     return {
@@ -87,9 +70,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Retries a single model's request on transient errors (503 = overloaded,
-// 429 = rate limited) with a short exponential backoff. Anything else
-// (400, 403, 404, etc.) fails immediately since retrying won't help.
 async function callGeminiWithRetry(url, payload, maxRetries = 2) {
   let lastError;
 
@@ -107,7 +87,7 @@ async function callGeminiWithRetry(url, payload, maxRetries = 2) {
         throw err;
       }
 
-      const delayMs = 1000 * Math.pow(2, attempt); // 1s, 2s...
+      const delayMs = 1000 * Math.pow(2, attempt); 
       console.warn(
         `Gemini request failed with ${status}, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})...`
       );
@@ -118,9 +98,6 @@ async function callGeminiWithRetry(url, payload, maxRetries = 2) {
   throw lastError;
 }
 
-// Models to try, in order. Different models often have independent load/quota,
-// so if the first one is overloaded (503) or rate-limited (429), we fall
-// through to the next one instead of failing outright.
 const GEMINI_MODEL_FALLBACKS = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
 async function callGeminiWithFallback(payload) {
@@ -141,7 +118,7 @@ async function callGeminiWithFallback(payload) {
       const isTransient = status === 503 || status === 429;
 
       if (!isTransient) {
-        throw err; // non-transient error (bad key, bad request) - no point trying other models
+        throw err; 
       }
 
       console.warn(`Model ${model} unavailable (status ${status}), trying next fallback model...`);
@@ -151,11 +128,6 @@ async function callGeminiWithFallback(payload) {
   throw lastError;
 }
 
-// ------------------------------------------------------------
-// POST /generate-roadmap
-// Body: { career, skillLevel }
-// Sends a structured prompt to Gemini and returns parsed JSON.
-// ------------------------------------------------------------
 app.post('/generate-roadmap', async (req, res) => {
   try {
     const { career, skillLevel } = req.body;
@@ -219,7 +191,6 @@ Requirements:
 
     const roadmapJson = extractJson(rawText);
 
-    // Basic shape validation / fallback defaults so the frontend never breaks
     roadmapJson.career = roadmapJson.career || career;
     roadmapJson.overview = roadmapJson.overview || '';
     roadmapJson.weeks = Array.isArray(roadmapJson.weeks) ? roadmapJson.weeks : [];
@@ -249,10 +220,6 @@ Requirements:
   }
 });
 
-// ------------------------------------------------------------
-// GET /youtube?career=
-// Returns top 4 YouTube videos related to the career.
-// ------------------------------------------------------------
 app.get('/youtube', async (req, res) => {
   try {
     const { career } = req.query;
@@ -294,10 +261,6 @@ app.get('/youtube', async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// GET /books?career=
-// Returns top 4 books from Open Library (no API key needed).
-// ------------------------------------------------------------
 app.get('/books', async (req, res) => {
   try {
     const { career } = req.query;
@@ -311,16 +274,13 @@ app.get('/books', async (req, res) => {
     const response = await axios.get(openLibraryUrl, {
       params: {
         q: career,
-        limit: 20, // fetch extra so we can prioritize ones that are actually readable online
+        limit: 20, 
         fields: 'title,author_name,cover_i,key,ia,ebook_access,has_fulltext'
       }
     });
 
     const allDocs = response.data.docs || [];
 
-    // Prefer books Internet Archive can render in its inline "read online" viewer.
-    // ebook_access "public" = fully readable now; "borrowable" = read after a
-    // 1-hour library loan (still no purchase). Both open a direct reader, not a store.
     const readableDocs = allDocs.filter(
       (doc) => doc.ia && doc.ia.length > 0 && ['public', 'borrowable'].includes(doc.ebook_access)
     );
@@ -333,8 +293,6 @@ app.get('/books', async (req, res) => {
         ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
         : 'https://via.placeholder.com/128x193?text=No+Cover';
 
-      // If Internet Archive has a scan, link straight to its reader.
-      // Otherwise fall back to the book's Open Library page.
       const readUrl =
         doc.ia && doc.ia.length > 0
           ? `https://archive.org/details/${doc.ia[0]}`
@@ -357,9 +315,6 @@ app.get('/books', async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------
-// Health check
-// ------------------------------------------------------------
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
